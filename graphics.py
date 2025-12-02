@@ -9,10 +9,6 @@ clock = pygame.time.Clock()
 window = pygame.display.set_mode([1920,1080])
 running = True
 
-#I should change things such that running into a wall while turnning will stop the rotation untill the key is released and pressed again. 
-#change a boolien on bounce if the key is down
-#change the boolean back when the key is depressed. 
-
 #Colors!
 #not sure how much I've actually used them, but they're here
 red = (255, 0, 0)
@@ -28,14 +24,15 @@ bounceEfficiency = .9
 offset = .01 # I don't think this should acually be needed, but It's here
 frameCount = 0
 lastCollsion = (0,0)
+wallHit = False
 
 walls = []
-
 #Color, point 1, point 2, Width
 wallData = [
-[(255,0,0), (700,0), (0,700), 5],
-[(255,0,0), (1220,0), (1920,700), 5],
-[(255,0,0), (0,700), (700,1080), 5]]
+[(255,0,0), (700,0), (0,700), 100],
+[(255,0,0), (1220,1080), (1920,380), 100],
+[(255,0,0), (0,700), (700,1080), 100],
+[(255,0,0), (1920,380), (1220,0), 100]]
 
 class playerObject:
     angle = 0.0
@@ -74,6 +71,7 @@ def drawPlayer():
     
 def screenEdgeCollision (collisionObject):
     global lastCollsion
+    global wallHit
     collisionTotal = 0
     for i in range(len(collisionObject.points)):
         if collisionObject.points[i].y < 0:
@@ -88,6 +86,8 @@ def screenEdgeCollision (collisionObject):
         if collisionObject.points[i].x < 0:
             #left side
             collisionTotal += 1000
+    if collisionTotal > 0:
+        wallHit = True
     if collisionTotal % 10 >= 1:
         #top edge
         if lastCollsion[0] == 1 and frameCount - lastCollsion[1] <= 5:
@@ -142,6 +142,7 @@ def screenEdgeCollision (collisionObject):
 
 def wallCollision (collisionObject):
     global lastCollsion
+    global wallHit
     for i in range(len(walls)):
         sideOfLine = []
         crossed = False
@@ -161,22 +162,30 @@ def wallCollision (collisionObject):
                     lastCollsion = (5 + i, frameCount, lastCollsion[0])
                     break
         if crossed == True and not (lastCollsion[2] == lastCollsion[0] and frameCount - lastCollsion[1] <= 5):
-            collisionObject.angle += 2 * (collisionObject.speed.angle_to(pygame.Vector2(1,walls[i].slope)))
+            angle = collisionObject.speed.angle_to(pygame.Vector2(1,walls[i].slope))
+            if angle > 180:
+                angle = angle - 180
+            collisionObject.angle += 2 * angle
             collisionObject.speed = collisionObject.speed.rotate((2 * collisionObject.speed.angle_to(pygame.Vector2(1,walls[i].slope))))
             collisionObject.speed.x = collisionObject.speed.x * bounceEfficiency
             collisionObject.speed.y = collisionObject.speed.y * bounceEfficiency
             print(lastCollsion[0], collisionObject.angle)
-            
+            wallHit = True
 
 def getInput ():
     keys = pygame.key.get_pressed()
+    global wallHit
+    if wallHit == True and (keys[pygame.K_d] or keys[pygame.K_a]):
+        pass
+    else:
+        wallHit = False
     if keys[pygame.K_w]:
         player.speed -= moveSpeed.rotate(player.angle)
     if keys[pygame.K_s]:
         player.speed -= moveSpeed.rotate(player.angle + 180)
-    if keys[pygame.K_d]:
+    if keys[pygame.K_d] == True and wallHit == False:
         player.angle += rotateSpeed
-    if keys[pygame.K_a]:
+    if keys[pygame.K_a] == True and wallHit == False:
         player.angle -= rotateSpeed
     
     if keys[pygame.K_UP]:
@@ -220,7 +229,7 @@ while running:
     player.speed.y = player.speed.y * airResitance
     player.speed.x = player.speed.x * airResitance
 
-    #bouncie arround the edges
+    #bouncie arround the edges + walls
     screenEdgeCollision(player)
     wallCollision(player)
 
