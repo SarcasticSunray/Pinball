@@ -9,36 +9,33 @@ clock = pygame.time.Clock()
 window = pygame.display.set_mode([1920,1080])
 running = True
 
-#Colors!
-#not sure how much I've actually used them, but they're here
-red = (255, 0, 0)
-green = (0, 255, 0)
-blue = (0, 0, 255)
-white = (255, 255, 255)
-black = (0, 0, 0)
-
 moveSpeed = pygame.Vector2(0,1)
-rotateSpeed = 1.5
+rotateSpeed = 1.75
 airResitance = .98
 bounceEfficiency = .9
 offset = .01 # I don't think this should acually be needed, but It's here
 frameCount = 0
 lastCollsion = (0,0)
 wallHit = False
+playerStart = (1/4, 3/4)
 
 walls = []
 #Color, point 1, point 2, Width
 wallData = [
-[(255,0,0), (700,0), (0,700), 100],
-[(255,0,0), (1220,1080), (1920,380), 100],
-[(255,0,0), (0,700), (700,1080), 100],
-[(255,0,0), (1920,380), (1220,0), 100]]
+    [(0,255,0), (250,0), (0,250), 5],
+    [(0,255,0), (1670,0), (1920,250), 5],
+    [(0,255,0), (250,1080), (0,830), 5],
+    [(0,255,0), (1670,1080), (1920,830), 5],
+    [(0,0,255), (960,640), (760,540), 5],
+    [(0,0,255), (960,440), (760,540), 5],
+    [(0,0,255), (960,640), (1160,540), 5],
+    [(0,0,255), (960,440), (1160,540), 5]]
 
 class playerObject:
     angle = 0.0
     size = 30
     color = (23,147,209)
-    position = pygame.Vector2(window.get_width() / 2, window.get_height() / 2)
+    position = pygame.Vector2(window.get_width() * playerStart[0], window.get_height() * playerStart[1])
     points = [pygame.Vector2(0,0),pygame.Vector2(0,0),pygame.Vector2(0,0),pygame.Vector2(0,0)]
     speed = pygame.Vector2(0,0)
 
@@ -65,9 +62,10 @@ def drawPlayer():
     
     window.blit(playerSurface, (player.position.x - (playerSurface.get_width() / 2), player.position.y - (playerSurface.get_height() / 2)))
     
-    pygame.draw.circle(window, black, player.points[0], 2)
-    pygame.draw.circle(window, black, player.points[1], 2)
-    pygame.draw.circle(window, black, player.points[3], 2)
+    #These are the points used for collisions:
+    #pygame.draw.circle(window, black, player.points[0], 2)
+    #pygame.draw.circle(window, black, player.points[1], 2)
+    #pygame.draw.circle(window, black, player.points[3], 2)
     
 def screenEdgeCollision (collisionObject):
     global lastCollsion
@@ -146,9 +144,11 @@ def wallCollision (collisionObject):
     for i in range(len(walls)):
         sideOfLine = []
         crossed = False
+        fullCrossed = False
         for j in range(len(collisionObject.points)):
             #y - mx + b  -- find out which side of the line this point is on. 
             sideOfLine.append(collisionObject.points[j].y - ((walls[i].slope * collisionObject.points[j].x) + (walls[i].b)))
+        print(sideOfLine)
         if sideOfLine[0] > 0:
             for k in range(len(sideOfLine) - 1):
                 if sideOfLine[k + 1] < 0:
@@ -161,11 +161,14 @@ def wallCollision (collisionObject):
                     crossed = True
                     lastCollsion = (5 + i, frameCount, lastCollsion[0])
                     break
-        if crossed == True and not (lastCollsion[2] == lastCollsion[0] and frameCount - lastCollsion[1] <= 5):
+        if crossed == True:
+            if ((collisionObject.points[j].x < walls[i].pointOne.x and collisionObject.points[j].x > walls[i].pointTwo.x) or (collisionObject.points[j].x > walls[i].pointOne.x and collisionObject.points[j].x < walls[i].pointTwo.x)) or ((collisionObject.points[j].y < walls[i].pointOne.y and collisionObject.points[j].y > walls[i].pointTwo.y) or (collisionObject.points[j].y > walls[i].pointOne.y and collisionObject.points[j].y < walls[i].pointTwo.y)):
+                fullCrossed = True
+        if fullCrossed == True and (not (lastCollsion[2] == lastCollsion[0]) and (frameCount - lastCollsion[1] <= 5)):
             angle = collisionObject.speed.angle_to(pygame.Vector2(1,walls[i].slope))
             if angle > 180:
                 angle = angle - 180
-            collisionObject.angle += 2 * angle
+            collisionObject.angle +=  2 * angle
             collisionObject.speed = collisionObject.speed.rotate((2 * collisionObject.speed.angle_to(pygame.Vector2(1,walls[i].slope))))
             collisionObject.speed.x = collisionObject.speed.x * bounceEfficiency
             collisionObject.speed.y = collisionObject.speed.y * bounceEfficiency
@@ -197,9 +200,14 @@ def getInput ():
     if keys[pygame.K_RIGHT]:
         player.position.x += moveSpeed.y
 
+    if keys[pygame.K_r]:
+        player.position = pygame.Vector2(window.get_width() * playerStart[0], window.get_height() * playerStart[1])
+        player.speed = pygame.Vector2()
+        player.angle = 0
+
 def drawWalls ():
     for wall in walls:
-        pygame.draw.line(window, wall.color, wall.pointOne, wall.pointTwo, 5)
+        pygame.draw.line(window, wall.color, wall.pointOne, wall.pointTwo, wall.width)
 
 #game setup
 player = playerObject()
@@ -209,9 +217,11 @@ for i in range(len(wallData)):
     walls[i].pointOne = pygame.Vector2(wallData[i][1])
     walls[i].pointTwo = pygame.Vector2(wallData[i][2])
     walls[i].width = wallData[i][3]
-    walls[i].slope = (walls[i].pointOne.y - walls[i].pointTwo.y) / (walls[i].pointOne.x - walls[i].pointTwo.x)
+    if (walls[i].pointOne.x - walls[i].pointTwo.x) == 0:
+        walls[i].slope = 1000000
+    else:
+        walls[i].slope = (walls[i].pointOne.y - walls[i].pointTwo.y) / (walls[i].pointOne.x - walls[i].pointTwo.x)
     walls[i].b = walls[i].pointOne.y - (walls[i].slope * walls[i].pointOne.x)
-
 
 #main game loop
 while running:
@@ -220,7 +230,7 @@ while running:
             running = False 
     
     #background
-    window.fill(white)
+    window.fill((255,255,255))
     
     #manage input
     getInput()
